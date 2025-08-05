@@ -33,7 +33,7 @@ class ParentState(TypedDict):
     main_message: str
 
 def parent_1(state: ParentState):
-    return {"main_message": "Hi " + state["main_message"]}
+    # return {"main_message": "Hi " + #####수정해보세요######}
 
 def call_child_graph(state: ParentState):
     output = child_graph.invoke({"child_message": state["main_message"]})
