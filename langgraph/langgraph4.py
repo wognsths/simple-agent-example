@@ -1,66 +1,33 @@
 from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START, END
-from langchain_upstage import ChatUpstage  # Gemini 모델용
-import os
-from dotenv import load_dotenv
+from langgraph.graph import StateGraph, START
 
-load_dotenv()
+# 상태 타입 1 정의
+class ParentState(TypedDict):
+    foo: str
 
-UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
+# 상태 타입 2 정의 (서브그래프는 상태 타입이 다름!)
+class SubgraphState(TypedDict):
+    bar: str
 
-# 상태 정의
-class State(TypedDict):
-    user_input: str
-    decision: str
-    result: str
+# 서브그래프 노드
+def subgraph_node(state: SubgraphState):
+    return {"bar": state["bar"] + " world"}
 
-# Gemini LLM 준비
-llm = ChatUpstage(model="solar-pro2")  # model 이름은 gemini-pro
+# 서브그래프 생성 (상태는 SubgraphState)
+subgraph_builder = StateGraph(SubgraphState)
+subgraph_builder.add_node("subgraph_node", subgraph_node)
+subgraph_builder.add_edge(START, "subgraph_node")
+subgraph = subgraph_builder.compile()
 
-# 라우팅 노드: Gemini가 yes/no를 판단
-def router(state: State) -> State:
-    prompt = (
-        f"다음 문장이 긍정인지 부정인지 판단하여 'yes' 또는 'no'만 출력하세요.\n"
-        f"문장: {state['user_input']}"
-    )
-    result = llm.invoke(prompt)
-    decision = result.content.strip().lower()
-    return {**state, "decision": decision}
+# 상위 그래프 생성 (상태는 ParentState)
+parent_builder = StateGraph(ParentState)
 
-# 긍정 분기 처리
-def handle_yes(state: State) -> State:
-    return {**state, "result": "긍정 처리"}
+# 오류 발생 지점: 상태 타입이 다른 서브그래프(부모 State와 자식 State가 다름)를 add_node에 추가
+parent_builder.add_node("subgraph", subgraph)  # 여기서 오류 발생, 어떻게 해결할까요?
 
-# 부정 분기 처리
-def handle_no(state: State) -> State:
-    return {**state, "result": "부정 처리"}
+parent_builder.add_edge(START, "subgraph")
+graph = parent_builder.compile()
 
-# 그래프 구성
-graph = StateGraph(State)
-graph.add_node("router", router)
-graph.add_node("handle_yes", handle_yes)
-graph.add_node("handle_no", handle_no)
-graph.add_edge(START, "router")
-
-# 조건부 분기
-def branching(state: State) -> str:
-    return "handle_yes" if state["decision"] == "yes" else "handle_no"
-
-graph.add_conditional_edges(
-    "router",
-    branching,
-    {"handle_yes": "handle_yes", "handle_no": "handle_no"}
-)
-
-graph.add_edge("handle_yes", END)
-graph.add_edge("handle_no", END)
-compiled = graph.compile()
-
-# 실행 예시
-if __name__ == "__main__":
-    result = compiled.invoke({
-        "user_input": "이 서비스 너무 만족스러워요!",
-        "decision": "",
-        "result": ""
-    })
-    print(result)
+# 실행 시도
+result = graph.invoke({"foo": "Hello"})
+print(result)

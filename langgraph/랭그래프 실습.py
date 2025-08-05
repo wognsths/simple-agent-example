@@ -6,7 +6,7 @@ class GrandChildState(TypedDict):
     message: str
 
 def grandchild_1(state: GrandChildState):
-#    return {"message": #####수정해보세요###### + ", I love u"}
+    return {"message": state["message"] + ", I love u"}
 
 grandchild_builder = StateGraph(GrandChildState)
 grandchild_builder.add_node("grandchild_1", grandchild_1)
@@ -33,11 +33,11 @@ class ParentState(TypedDict):
     main_message: str
 
 def parent_1(state: ParentState):
-#    return {"main_message": "Hi " + #####수정해보세요######}
+    return {"main_message": "Hi " + state["main_message"]}
 
 def call_child_graph(state: ParentState):
     output = child_graph.invoke({"child_message": state["main_message"]})
-#    return {"main_message": #####수정해보세요######}
+    return {"main_message": output["child_message"]}
 
 parent_builder = StateGraph(ParentState)
 parent_builder.add_node("parent_1", parent_1)

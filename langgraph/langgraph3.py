@@ -1,33 +1,46 @@
 from typing_extensions import TypedDict
-from langgraph.graph import StateGraph, START
 
-# 상태 타입 1 정의
+# 서브그래프용 상태
+class SubgraphState(TypedDict):
+    bar: str
+    baz: str
+
+def subgraph_node_1(state: SubgraphState):
+    return {"baz": state["baz"]}
+
+def subgraph_node_2(state: SubgraphState):
+    return {"bar": state["bar"] + state["baz"]}
+
+# 서브그래프 생성
+# START → subgraph_node_1 → subgraph_node_2로 실행되는 순서
+from langgraph.graph import StateGraph, START
+subgraph_builder = StateGraph(SubgraphState)
+subgraph_builder.add_node(subgraph_node_1)
+subgraph_builder.add_node(subgraph_node_2)
+subgraph_builder.add_edge(START, "subgraph_node_1")
+subgraph_builder.add_edge("subgraph_node_1", "subgraph_node_2")
+subgraph = subgraph_builder.compile()
+
+# 상위 그래프의 상태
 class ParentState(TypedDict):
     foo: str
 
-# 상태 타입 2 정의 (서브그래프는 상태 타입이 다름!)
-class SubgraphState(TypedDict):
-    bar: str
+def node_1(state: ParentState):
+    return {"foo": "Hi! " + state["foo"]}
 
-# 서브그래프 노드
-def subgraph_node(state: SubgraphState):
-    return {"bar": state["bar"] + " world"}
+def node_2(state: ParentState):
+    # 필요한 값만 추출해서 서브그래프에 입력
+    response = subgraph.invoke({"bar": state["foo"], "baz": " 27th"})
+    # f'{state["foo"]}{baz}' 형태의 출력이 되겠죠!
+    return {"foo": response["bar"]}
 
-# 서브그래프 생성 (상태는 SubgraphState)
-subgraph_builder = StateGraph(SubgraphState)
-subgraph_builder.add_node("subgraph_node", subgraph_node)
-subgraph_builder.add_edge(START, "subgraph_node")
-subgraph = subgraph_builder.compile()
-
-# 상위 그래프 생성 (상태는 ParentState)
 parent_builder = StateGraph(ParentState)
-
-# 오류 발생 지점: 상태 타입이 다른 서브그래프를 add_node에 추가
-parent_builder.add_node("subgraph", subgraph)  # 여기서 오류 발생 예상
-
-parent_builder.add_edge(START, "subgraph")
+parent_builder.add_node("node_1", node_1)
+parent_builder.add_node("node_2", node_2)
+parent_builder.add_edge(START, "node_1")
+parent_builder.add_edge("node_1", "node_2")
 graph = parent_builder.compile()
 
-# 실행 시도
-result = graph.invoke({"foo": "Hello"})
-print(result)
+# 실행
+result = graph.invoke({"foo": "YBIGTA"})
+print(result)  
